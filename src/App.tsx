@@ -9,7 +9,7 @@ interface HistoryItem {
 function App() {
   const [display, setDisplay] = useState('0')
   const [equation, setEquation] = useState('')
-  const [history, setHistory] = useState<HistoryItem[]>([])
+  const [history, setHistory] = useState<string[]>([])
   const [memory, setMemory] = useState<number>(0)
   const [showHistory, setShowHistory] = useState(false)
 
@@ -116,15 +116,21 @@ function App() {
       case '=':
         try {
           const result = new Function('return ' + equation)()
-          setDisplay(String(result))
+          const formattedResult = Number.isFinite(result) ? 
+            Number(result).toLocaleString('he-IL', { maximumFractionDigits: 4 }) : 
+            'שגיאה'
+          
+          setHistory(prev => [...prev, `${equation} = ${formattedResult}`])
+          setDisplay(formattedResult)
           setEquation(String(result))
         } catch {
-          setDisplay('Error')
+          setDisplay('שגיאה')
           setEquation('')
         }
         break
       default:
-        // מונע הוספת אופרטור כתו ראשון (חוץ ממינוס)
+        if (!isValidInput(value, equation)) return
+        
         if (['+', '*', '/', '.'].includes(value) && equation === '') {
           return
         }
@@ -171,6 +177,14 @@ function App() {
     window.addEventListener('keydown', handleKeyPress)
     return () => window.removeEventListener('keydown', handleKeyPress)
   }, [equation])
+
+  const isValidInput = (value: string, currentEquation: string): boolean => {
+    // מניעת כפל נקודות עשרוניות במספר
+    if (value === '.' && currentEquation.split(/[-+*/]/).pop()?.includes('.')) {
+      return false
+    }
+    return true
+  }
 
   return (
     <div className="min-h-screen bg-gray-100 p-4">
@@ -234,6 +248,35 @@ function App() {
           </div>
         </div>
       </div>
+
+      {history.length > 0 && (
+        <div className="mt-6 bg-white rounded-xl shadow-lg p-6">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-bold text-blue-600">היסטוריית חישובים</h2>
+            <button 
+              onClick={() => setHistory([])}
+              className="text-red-400 hover:text-red-500"
+            >
+              נקה היסטוריה
+            </button>
+          </div>
+          <div className="space-y-2 text-right">
+            {history.map((calc, index) => (
+              <div 
+                key={index}
+                className="p-2 hover:bg-blue-50 rounded cursor-pointer"
+                onClick={() => {
+                  const result = calc.split('=')[1].trim()
+                  setDisplay(result)
+                  setEquation(result)
+                }}
+              >
+                {calc}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
