@@ -1,4 +1,9 @@
 import { useState, useEffect } from 'react'
+import { ScientificButtons } from './components/ScientificButtons'
+import { NumberPad } from './components/NumberPad'
+import { History } from './components/History'
+import { isValidInput, calculateExpression } from './utils/calculator'
+import { Menu } from './components/Menu'
 import './App.css'
 
 interface HistoryItem {
@@ -9,42 +14,36 @@ interface HistoryItem {
 function App() {
   const [display, setDisplay] = useState('0')
   const [equation, setEquation] = useState('')
-  const [history, setHistory] = useState<string[]>([])
+  const [history, setHistory] = useState<HistoryItem[]>([])
   const [memory, setMemory] = useState<number>(0)
   const [showHistory, setShowHistory] = useState(false)
-
-  const scientificButtons = [
-    ['sin', 'cos', 'tan', 'π'],
-    ['√', 'x²', '%', '±'],
-    ['(', ')', 'MC', 'MR'],
-    ['M+', 'M-', 'MS', '1/x'],
-  ]
+  const [theme, setTheme] = useState<'light' | 'dark'>('light')
 
   const handleScientific = (value: string) => {
     switch(value) {
       case 'sin':
-        calculate(`Math.sin(${equation})`)
+        calculateExpression(`Math.sin(${equation})`)
         break
       case 'cos':
-        calculate(`Math.cos(${equation})`)
+        calculateExpression(`Math.cos(${equation})`)
         break
       case 'tan':
-        calculate(`Math.tan(${equation})`)
+        calculateExpression(`Math.tan(${equation})`)
         break
       case 'π':
         appendToEquation(Math.PI.toString())
         break
       case '√':
-        calculate(`Math.sqrt(${equation})`)
+        calculateExpression(`Math.sqrt(${equation})`)
         break
       case 'x²':
-        calculate(`(${equation}) * (${equation})`)
+        calculateExpression(`(${equation}) * (${equation})`)
         break
       case '%':
-        calculate(`(${equation}) / 100`)
+        calculateExpression(`(${equation}) / 100`)
         break
       case '±':
-        calculate(`-(${equation})`)
+        calculateExpression(`-(${equation})`)
         break
       case 'MC':
         setMemory(0)
@@ -62,7 +61,7 @@ function App() {
         setMemory(Number(display))
         break
       case '1/x':
-        calculate(`1/(${equation})`)
+        calculateExpression(`1/(${equation})`)
         break
     }
   }
@@ -120,7 +119,10 @@ function App() {
             Number(result).toLocaleString('he-IL', { maximumFractionDigits: 4 }) : 
             'שגיאה'
           
-          setHistory(prev => [...prev, `${equation} = ${formattedResult}`])
+          setHistory(prev => [...prev, { 
+            equation: equation,
+            result: formattedResult 
+          }])
           setDisplay(formattedResult)
           setEquation(String(result))
         } catch {
@@ -178,22 +180,44 @@ function App() {
     return () => window.removeEventListener('keydown', handleKeyPress)
   }, [equation])
 
-  const isValidInput = (value: string, currentEquation: string): boolean => {
-    // מניעת כפל נקודות עשרוניות במספר
-    if (value === '.' && currentEquation.split(/[-+*/]/).pop()?.includes('.')) {
-      return false
-    }
-    return true
+  const handleThemeChange = (newTheme: 'light' | 'dark') => {
+    setTheme(newTheme)
+    document.documentElement.classList.toggle('dark', newTheme === 'dark')
+  }
+
+  const handleExport = () => {
+    const historyData = JSON.stringify(history, null, 2)
+    const blob = new Blob([historyData], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'calculator-history.json'
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  const handleClearAll = () => {
+    setDisplay('0')
+    setEquation('')
+    setHistory([])
+    setMemory(0)
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 p-4">
-      <div className="mx-auto max-w-2xl bg-white rounded-lg shadow p-6">
+    <div className={`min-h-screen ${theme === 'dark' ? 'bg-gray-900 text-white' : 'bg-gray-100'} p-4`}>
+      <div className={`mx-auto max-w-2xl ${theme === 'dark' ? 'bg-gray-800' : 'bg-white'} rounded-lg shadow p-6`}>
         <div className="flex justify-between items-center mb-4">
-          <h1 className="text-2xl font-bold">מחשבון מדעי</h1>
+          <div className="flex items-center gap-4">
+            <Menu 
+              onThemeChange={handleThemeChange}
+              onClearAll={handleClearAll}
+              onExport={handleExport}
+            />
+            <h1 className="text-2xl font-bold">מחשבון מדעי</h1>
+          </div>
           <button 
             onClick={() => setShowHistory(!showHistory)}
-            className="bg-gray-500 hover:bg-gray-600 text-white px-3 py-1 rounded"
+            className={`${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-500'} hover:opacity-90 text-white px-3 py-1 rounded`}
           >
             היסטוריה
           </button>
@@ -208,75 +232,20 @@ function App() {
               <div className="text-right text-2xl font-mono">{display}</div>
             </div>
 
-            {/* Scientific buttons */}
-            <div className="grid grid-cols-4 gap-2 mb-4">
-              {scientificButtons.map((row, i) => (
-                row.map((btn) => (
-                  <button
-                    key={btn}
-                    onClick={() => handleScientific(btn)}
-                    className="bg-purple-500 hover:bg-purple-600 text-white p-2 rounded text-sm"
-                  >
-                    {btn}
-                  </button>
-                ))
-              ))}
-            </div>
-
-            {/* Regular buttons */}
-            <div className="grid grid-cols-4 gap-2">
-              {[
-                'CE', '⌫', 'C', '/',
-                '7', '8', '9', '*',
-                '4', '5', '6', '-',
-                '1', '2', '3', '+',
-                '0', '.', '=',
-              ].map((btn) => (
-                <button 
-                  key={btn}
-                  onClick={() => handleClick(btn)}
-                  className={`
-                    ${btn === '=' ? 'col-span-2' : ''} 
-                    ${['CE', '⌫', 'C'].includes(btn) ? 'bg-red-500 hover:bg-red-600' : 'bg-blue-500 hover:bg-blue-600'}
-                    text-white p-2 rounded
-                  `}
-                >
-                  {btn}
-                </button>
-              ))}
-            </div>
+            <ScientificButtons onScientificClick={handleScientific} />
+            <NumberPad onButtonClick={handleClick} />
           </div>
         </div>
       </div>
 
-      {history.length > 0 && (
-        <div className="mt-6 bg-white rounded-xl shadow-lg p-6">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-bold text-blue-600">היסטוריית חישובים</h2>
-            <button 
-              onClick={() => setHistory([])}
-              className="text-red-400 hover:text-red-500"
-            >
-              נקה היסטוריה
-            </button>
-          </div>
-          <div className="space-y-2 text-right">
-            {history.map((calc, index) => (
-              <div 
-                key={index}
-                className="p-2 hover:bg-blue-50 rounded cursor-pointer"
-                onClick={() => {
-                  const result = calc.split('=')[1].trim()
-                  setDisplay(result)
-                  setEquation(result)
-                }}
-              >
-                {calc}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      <History 
+        history={history}
+        onHistoryClear={() => setHistory([])}
+        onHistoryItemClick={(result) => {
+          setDisplay(result)
+          setEquation(result)
+        }}
+      />
     </div>
   )
 }
