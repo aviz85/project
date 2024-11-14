@@ -94,6 +94,58 @@ function App() {
     }
   }
 
+  const handleClick = (value: string) => {
+    switch(value) {
+      case 'C':
+        setDisplay('0')
+        setEquation('')
+        break
+      case 'CE':
+        setDisplay('0')
+        setEquation('')
+        break
+      case '⌫':
+        if (equation.length > 1) {
+          setEquation(prev => prev.slice(0, -1))
+          setDisplay(prev => prev.slice(0, -1))
+        } else {
+          setEquation('0')
+          setDisplay('0')
+        }
+        break
+      case '=':
+        try {
+          const result = new Function('return ' + equation)()
+          setDisplay(String(result))
+          setEquation(String(result))
+        } catch {
+          setDisplay('Error')
+          setEquation('')
+        }
+        break
+      default:
+        // מונע הוספת אופרטור כתו ראשון (חוץ ממינוס)
+        if (['+', '*', '/', '.'].includes(value) && equation === '') {
+          return
+        }
+        // מונע כפל אופרטורים
+        if (['+', '-', '*', '/', '.'].includes(value) && 
+            ['+', '-', '*', '/', '.'].includes(equation.slice(-1))) {
+          setEquation(prev => prev.slice(0, -1) + value)
+          setDisplay(prev => prev.slice(0, -1) + value)
+          return
+        }
+        
+        if (equation === '0' && !isNaN(Number(value))) {
+          setEquation(value)
+          setDisplay(value)
+        } else {
+          setEquation(prev => prev + value)
+          setDisplay(prev => prev + value)
+        }
+    }
+  }
+
   // Keyboard support
   useEffect(() => {
     const handleKeyPress = (e: KeyboardEvent) => {
